@@ -1,5 +1,15 @@
 import React, { useState } from "react";
 
+const CATEGORIES = [
+  "Food", 
+  "Housing", 
+  "Transportation", 
+  "Utilities", 
+  "Entertainment", 
+  "Personal Care",
+  "Miscellaneous"
+];
+
 export default function ExpenseForm({ onAdd }) {
 
   const [amount, setAmount] = useState("");
@@ -59,6 +69,17 @@ export default function ExpenseForm({ onAdd }) {
         value={date}
         onChange={(e) => setDate(e.target.value)}
       /><br/>
+
+      <select
+        value={category}
+        onChange={(e) => setCategory(e.target.value)}
+        required
+      >
+      <option value="" disabled>Select Category</option>
+      {CATEGORIES.map((cat) => (
+        <option key={cat} value={cat}>{cat}</option>
+      ))}
+      </select><br/>
 
       <button type="submit">Add Expense</button>
     </form>
