@@ -3,6 +3,7 @@ import ExpenseForm from "./components/ExpenseForm";
 import ExpenseList from "./components/ExpenseList";
 import EditExpenseForm from "./components/EditExpenseForm";
 import AnalyticsDisplay from "./components/AnalyticsDisplay";
+import RecommendationsDisplay from "./components/RecommendationsDisplay";
 
 function App() {
   const [refresh, setRefresh] = useState(false);
@@ -45,6 +46,7 @@ function App() {
     <div>
       <h1>Expense Tracker</h1>
 
+      <RecommendationsDisplay />
       <AnalyticsDisplay />
       
       {renderForm()}
