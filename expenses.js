@@ -20,6 +20,96 @@ router.post("/", async (req, res) => {
     res.json(result.rows[0]);
 });
 
+// for recommendations
+router.get("/recommendations", async (req, res) => {
+    try {
+        const { year, month } = req.query; 
+
+        if (!year || !month) {
+            return res.status(400).json({ error: "Missing year and month parameters." });
+        }
+        
+        const recommendations = [];
+        
+        // get average monthly spending
+        const avgQuery = `
+            SELECT 
+                category,
+                AVG(monthly_total) as historical_avg
+            FROM (
+                SELECT 
+                    category,
+                    EXTRACT(YEAR FROM date::date) AS yr,
+                    EXTRACT(MONTH FROM date::date) AS mth,
+                    SUM(amount::numeric) AS monthly_total
+                FROM expenses
+                GROUP BY category, yr, mth
+            ) AS monthly_summary
+            GROUP BY category;
+        `;
+        const avgResult = await pool.query(avgQuery);
+        const historicalAverages = avgResult.rows.reduce((acc, row) => {
+            acc[row.category] = parseFloat(row.historical_avg);
+            return acc;
+        }, {});
+        
+        
+        // gets current month spending
+        const currentQuery = `
+            SELECT 
+                category,
+                SUM(amount::numeric) AS current_month_total
+            FROM expenses
+            WHERE 
+                EXTRACT(YEAR FROM date::date) = $1 AND 
+                EXTRACT(MONTH FROM date::date) = $2
+            GROUP BY category
+            ORDER BY current_month_total DESC;
+        `;
+        const currentResult = await pool.query(currentQuery, [year, month]);
+        const currentSpending = currentResult.rows.map(row => ({
+            category: row.category,
+            total: parseFloat(row.current_month_total)
+        }));
+
+        
+        // generates recommendations
+        // some magic numbers for that lol
+        const CUTOFF_PERCENT = 1.20; 
+        const HIGH_SPENDING_CATEGORIES = 2; 
+
+        // analyzes spikes in spending vs historical average spending, 
+        currentSpending.forEach(item => {
+            const avg = historicalAverages[item.category] || 0; 
+            
+            if (item.total > 100 && item.total > avg * CUTOFF_PERCENT) {
+                const percentIncrease = ((item.total - avg) / avg) * 100;
+                recommendations.push(`Your ${item.category} spending ($${item.total.toFixed(2)}) is ${percentIncrease.toFixed(0)}% higher than your average ($${avg.toFixed(2)}). Look for ways to cut back in this area.`);
+            }
+        });
+
+        // top spending categories recommendation
+        if (currentSpending.length > 0) {
+            currentSpending.slice(0, HIGH_SPENDING_CATEGORIES).forEach((item, index) => {
+                if (index === 0) {
+                    recommendations.push(`Highest Spending: Your highest expense this month is in the **${item.category}** category ($${item.total.toFixed(2)}). Try to spend less here.`);
+                }
+            });
+        }
+        
+        // message that displays if no recommendations are to be made
+        if (recommendations.length === 0) {
+            recommendations.push("No notes. Good job! :D");
+        }
+
+        res.json(recommendations);
+
+    } catch (err) {
+        console.error("Recommendations fetch error:", err);
+        res.status(500).send("Server error during recommendations fetch.");
+    }
+});
+
 // for fetching
 router.get("/", async (req, res) => {
     try {
